@@ -1,0 +1,152 @@
+// src/utils/axiosClient.js
+import axios from "axios";
+import { authAPI } from "../services/authservice";
+const API_BASE_URL = import.meta.env.VITE_BASE_URL;
+
+// Tạo một instance của axios với cấu hình sẵn
+const apiClient = axios.create({
+  baseURL:  API_BASE_URL, // Địa chỉ API gốc của bạn
+  headers: {
+    "Content-Type": "application/json",
+    'Accept': 'application/json'
+  },
+});
+
+
+// ✅ Biến để theo dõi refresh token đang được thực hiện
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
+
+// Request interceptor - thêm token vào header
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor - xử lý response và error
+apiClient.interceptors.response.use(
+  (response) => {
+    return response.data
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response) {
+      const { status, data } = error.response
+
+      switch (status) {
+        case 401:
+          // ✅ Kiểm tra nếu đã thử refresh token rồi
+          if (originalRequest._retry) {
+            // Đã thử refresh nhưng vẫn 401 -> logout
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('user-info')
+            router.push('/login?return_url=' + router.currentRoute.value.fullPath)
+            return Promise.reject(error);
+          }
+
+          // ✅ Kiểm tra nếu request này là refresh-token
+          if (originalRequest.url.includes('/auth/refresh-token')) {
+            // Refresh token cũng bị 401 -> logout
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('user-info')
+            router.push('/login?return_url=' + router.currentRoute.value.fullPath)
+            return Promise.reject(error);
+          }
+
+          originalRequest._retry = true;
+
+          if (isRefreshing) {
+            // ✅ Nếu đang refresh, đợi kết quả
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject });
+            }).then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return apiClient(originalRequest);
+            }).catch(err => {
+              return Promise.reject(err);
+            });
+          }
+
+          isRefreshing = true;
+
+          try {
+            // ✅ Gọi refresh token API
+            const response = await authAPI.refreshToken();
+
+            if (response.accessToken) {
+              localStorage.setItem('accessToken', response.accessToken);
+
+              // ✅ Cập nhật header cho request gốc
+              originalRequest.headers.Authorization = `Bearer ${response.accessToken}`;
+
+              // ✅ Xử lý các request đang chờ
+              processQueue(null, response.accessToken);
+
+              // ✅ Retry request gốc
+              return apiClient(originalRequest);
+            }
+          } catch (refreshError) {
+            // ✅ Refresh token thất bại -> logout
+            processQueue(refreshError, null);
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('user-info')
+            //router.push('/login?return_url=' + router.currentRoute.value.fullPath)
+            return Promise.reject(refreshError);
+          } finally {
+            isRefreshing = false;
+          }
+          break;
+
+        case 403:
+          console.error('Không có quyền truy cập')
+          break
+        case 404:
+          console.error('API không tồn tại')
+          break
+        case 500:
+          console.error('Lỗi server')
+          break
+        default:
+          console.error('Lỗi không xác định:', data?.message || error.message)
+      }
+
+      return Promise.reject(data || error.response)
+    } else if (error.request) {
+      // Network error
+      console.error('Lỗi kết nối mạng')
+      return Promise.reject({ message: 'Lỗi kết nối mạng' })
+    } else {
+      console.error('Lỗi:', error.message)
+      return Promise.reject(error)
+    }
+  }
+)
+
+// (Tuỳ chọn) Thêm interceptors nếu cần xử lý request/response tập trung
+// apiClient.interceptors.request.use(config => {
+//   // Thêm token hoặc xử lý request ở đây nếu cần
+//   return config;
+// });
+
+export default apiClient;
