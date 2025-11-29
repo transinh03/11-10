@@ -129,36 +129,36 @@
         </template>
 
         <!-- InventoryManager -->
-        <template >
-          <router-link
-            to="/kho"
-            class="menu-item"
-            exact-active-class="active"
-            title="Quản lý kho"
-          >
-            <i class="fas fa-columns"></i>
-          </router-link>
-        </template>
+        <template v-if="authStore.isInventoryManager"> 
+        <router-link
+          to="/kho"
+          class="menu-item"
+          exact-active-class="active"
+          title="Quản lý kho"
+        >
+          <i class="fas fa-columns"></i>
+        </router-link>
+         </template> 
 
         <!-- Cashier -->
-        <template >
-          <router-link
-            to="/ThuNgan"
-            class="menu-item"
-            exact-active-class="active"
-            title="Thu Ngân"
-          >
-            <i class="fa-solid fa-wallet"></i>
-          </router-link>
-          <router-link
-            to="/chat"
-            class="menu-item"
-            exact-active-class="active"
-            title="Chat"
-          >
-            <i class="fa-solid fa-comment"></i>
-          </router-link>
-        </template>
+        <template v-if="authStore.isCashier"> 
+        <router-link
+          to="/ThuNgan"
+          class="menu-item"
+          exact-active-class="active"
+          title="Thu Ngân"
+        >
+          <i class="fa-solid fa-wallet"></i>
+        </router-link>
+        <router-link
+          to="/chat"
+          class="menu-item"
+          exact-active-class="active"
+          title="Chat"
+        >
+          <i class="fa-solid fa-comment"></i>
+        </router-link>
+        </template> 
 
         <div v-if="authStore.isAdmin" class="menu-title">Thống kê</div>
 

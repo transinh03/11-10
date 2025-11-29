@@ -118,7 +118,10 @@
     <main class="main-content"><router-view></router-view></main>
 
     <!-- Floating Button -->
-    <div class="chat-popup-wrapper">
+    <div
+      class="chat-popup-wrapper"
+      :class="{ chatOpen: chatOpen, aiChatOpen: aiChatOpen }"
+    >
       <!-- Chat Toggle Button -->
       <button
         v-if="!chatOpen"
@@ -131,7 +134,18 @@
           unreadCount
         }}</span>
       </button>
-
+      <!-- AI Chat Toggle (Gemini) -->
+      <button
+        v-if="!aiChatOpen"
+        @click="toggleAiChat"
+        class="ai-chat-toggle-btn"
+        title="Tư vấn AI tự động"
+      >
+        <i class="fas fa-robot"></i>
+        <span v-if="aiHasUnread" class="notification-badge">{{
+          aiUnreadCount
+        }}</span>
+      </button>
       <!-- Chat Window -->
       <div v-if="chatOpen" class="chat-window">
         <div class="chat-header">
@@ -225,6 +239,116 @@
           </div>
         </div>
       </div>
+      <!-- AI Chat Window (Gemini) -->
+      <div v-if="aiChatOpen" class="ai-chat-window">
+        <div class="chat-header ai-header">
+          <div class="ai-header-content">
+            <div class="ai-icon-wrapper">
+              <i class="fas fa-robot ai-icon"></i>
+            </div>
+            <div class="ai-header-text">
+              <h3>AI Tư Vấn Spa</h3>
+              <p>
+                <i class="fas fa-circle status-dot"></i>
+                Trợ lý ảo 24/7
+              </p>
+            </div>
+          </div>
+          <button @click="toggleAiChat" class="close-btn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- AI Suggestions -->
+        <div v-if="aiChatMessages.length === 0" class="ai-suggestions">
+          <p class="suggestions-title">
+            <i class="fas fa-lightbulb"></i> Gợi ý câu hỏi:
+          </p>
+          <button
+            @click="
+              aiInput = 'Các dịch vụ massage có gì?';
+              sendAiMessage();
+            "
+            class="suggestion-btn"
+          >
+            <i class="fas fa-spa"></i> Các dịch vụ massage
+          </button>
+          <button
+            @click="
+              aiInput = 'Bảng giá dịch vụ?';
+              sendAiMessage();
+            "
+            class="suggestion-btn"
+          >
+            <i class="fas fa-tag"></i> Bảng giá dịch vụ
+          </button>
+          <button
+            @click="
+              aiInput = 'Spa gồm những loại dịch vụ nào?';
+              sendAiMessage();
+            "
+            class="suggestion-btn"
+          >
+            <i class="fas fa-clock"></i> Spa gồm những loại dịch vụ nào?
+          </button>
+         
+        </div>
+
+        <div class="chat-messages ai-messages" ref="aiMessagesRef">
+          <!-- AI Loading Indicator -->
+          <div v-if="aiLoading" class="ai-loading-wrapper">
+            <div class="ai-loading">
+              <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <p>Đang suy nghĩ...</p>
+            </div>
+          </div>
+
+          <div
+            v-for="msg in aiChatMessages"
+            :key="msg.id"
+            :class="['message', msg.role, 'ai-message']"
+          >
+            <div class="message-avatar" v-if="msg.role === 'bot'">
+              <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-bubble ai-bubble">
+              <div v-if="msg.role === 'bot'" class="bot-name">AI Assistant</div>
+              {{ msg.content }}
+              <div class="message-time">{{ formatTime(msg.time) }}</div>
+            </div>
+            <div class="message-avatar user-avatar" v-if="msg.role === 'user'">
+              <i class="fas fa-user"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input ai-input">
+          <div class="input-group">
+            <input
+              v-model="aiInput"
+              @keyup.enter="sendAiMessage"
+              placeholder="Hỏi về massage, facial, giá cả..."
+              :disabled="aiLoading"
+              class="ai-message-input"
+            />
+            <button
+              @click="sendAiMessage"
+              :disabled="!aiInput.trim() || aiLoading"
+              class="send-btn ai-send-btn"
+            >
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+          <div class="ai-footer-note">
+            <i class="fas fa-info-circle"></i>
+            Trợ lý AI có thể mắc lỗi. Vui lòng kiểm tra thông tin.
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Footer -->
@@ -270,6 +394,7 @@ import { onMounted, onUnmounted, ref, nextTick } from "vue";
 import * as signalR from "@microsoft/signalr";
 import { useAuthState } from "./services/authstate";
 import { authAPI } from "./services/authservice";
+import apiClient from "../src/utils/axiosClient";
 
 const chatClosed = ref(false);
 const adminDisconnected = ref(false);
@@ -287,6 +412,15 @@ const userName = ref(null);
 const connection = ref(null);
 const chatMessages = ref(null);
 const assignedAdmin = ref({ id: null, name: null });
+
+// AI Chat State
+const aiChatOpen = ref(false);
+const aiInput = ref("");
+const aiChatMessages = ref([]);
+const aiLoading = ref(false);
+const aiHasUnread = ref(false);
+const aiUnreadCount = ref(0);
+const aiMessagesRef = ref(null);
 
 const isNavbarHidden = ref(false);
 let lastScroll = 0;
@@ -460,6 +594,9 @@ async function startConnection() {
 }
 
 function toggleChat() {
+  if (aiChatOpen.value) {
+    aiChatOpen.value = false;
+  }
   chatOpen.value = !chatOpen.value;
   if (chatOpen.value) {
     hasUnreadMessages.value = false;
@@ -629,10 +766,71 @@ setInterval(() => {
     }
   }
 }, 5000);
+
+function toggleAiChat() {
+  if (chatOpen.value) {
+    chatOpen.value = false;
+  }
+  aiChatOpen.value = !aiChatOpen.value;
+  if (aiChatOpen.value) {
+    aiHasUnread.value = false;
+    aiUnreadCount.value = 0;
+    nextTick(() => scrollAiToBottom());
+  }
+}
+
+async function sendAiMessage() {
+  if (!aiInput.value.trim() || aiLoading.value) return;
+
+  const userMsg = {
+    id: Date.now(),
+    role: "user",
+    content: aiInput.value,
+    time: new Date(),
+  };
+  aiChatMessages.value.push(userMsg);
+
+  const question = aiInput.value;
+  aiInput.value = "";
+  aiLoading.value = true;
+
+  try {
+    const res = await apiClient.post("/GeminiSpa/consult", { question });
+    const botMsg = {
+      id: Date.now() + 1,
+      role: "bot",
+      content: res.answer || "Xin lỗi, tôi chưa hiểu câu hỏi.",
+      time: new Date(),
+    };
+    aiChatMessages.value.push(botMsg);
+
+    if (!aiChatOpen.value) {
+      aiHasUnread.value = true;
+      aiUnreadCount.value++;
+    }
+  } catch (err) {
+    console.error("Lỗi Gemini API:", err);
+    aiChatMessages.value.push({
+      id: Date.now() + 1,
+      role: "bot",
+      content: "Lỗi kết nối AI. Vui lòng thử lại.",
+      time: new Date(),
+    });
+  } finally {
+    aiLoading.value = false;
+    nextTick(() => scrollAiToBottom());
+  }
+}
+
+function scrollAiToBottom() {
+  if (aiMessagesRef.value) {
+    aiMessagesRef.value.scrollTop = aiMessagesRef.value.scrollHeight;
+  }
+}
 </script>
 
 <style scoped>
-/* Reset & Base */
+/* ===== RESET & BASE ===== */
 * {
   margin: 0;
   padding: 0;
@@ -647,7 +845,7 @@ body {
   background-color: #f8fcf8;
 }
 
-/* Header Styles - Enhanced WOW Factor */
+/* ===== HEADER STYLES ===== */
 .header {
   background: linear-gradient(
     135deg,
@@ -679,10 +877,11 @@ body {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.03) 50%,
     transparent 100%
   );
-  animation: shimmer 3s ease-in-out infinite;
+  animation: shimmer 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes shimmer {
@@ -711,6 +910,7 @@ body {
   height: 70px;
 }
 
+/* ===== LOGO ===== */
 .logo {
   font-size: 1.8rem;
   font-weight: 700;
@@ -746,7 +946,7 @@ body {
   transform: rotate(5deg);
 }
 
-/* Mobile Menu Toggle - Enhanced */
+/* ===== MOBILE MENU TOGGLE ===== */
 .mobile-menu-toggle {
   display: none;
   flex-direction: column;
@@ -788,7 +988,7 @@ body {
   transform: rotate(45deg) translate(-5px, -6px);
 }
 
-/* Navigation Links - Enhanced */
+/* ===== NAVIGATION LINKS ===== */
 .nav-links {
   display: flex;
   list-style: none;
@@ -801,7 +1001,7 @@ body {
   color: white;
   text-decoration: none;
   font-weight: 600;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   padding: 0.7rem 1.2rem;
   border-radius: 50px;
   position: relative;
@@ -811,76 +1011,19 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.nav-links a::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  transition: left 0.5s ease;
-}
-
-.nav-links a::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0%;
-  height: 2px;
-  background: linear-gradient(90deg, #ffd700, #ffed4e);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(-50%);
-  border-radius: 2px;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
-}
-
 .nav-links a:hover {
-  color: #ffd700;
+  color: white;
   background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 215, 0, 0.3);
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2), 0 0 20px rgba(255, 215, 0, 0.3);
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-.nav-links a:hover::before {
-  left: 100%;
-}
-
-.nav-links a:hover::after {
-  width: 80%;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .nav-links a:active {
-  transform: translateY(-1px) scale(1.02);
+  transform: translateY(0);
 }
 
-/* --- Disable header menu button effects, but keep .book-btn effects --- */
-.nav-links a,
-.nav-links a:hover,
-.nav-links a:active {
-  transition: none !important;
-  box-shadow: none !important;
-  transform: none !important;
-  text-shadow: none !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: white !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.nav-links a::before,
-.nav-links a::after {
-  display: none !important;
-}
-
-/* Mobile User Actions in Menu */
+/* ===== MOBILE USER ACTIONS ===== */
 .mobile-user-actions {
   display: none;
 }
@@ -930,7 +1073,7 @@ body {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Desktop User Actions */
+/* ===== DESKTOP USER ACTIONS ===== */
 .user-actions {
   display: flex;
   align-items: center;
@@ -1002,13 +1145,369 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
-/* Main Content */
+/* ===== MAIN CONTENT ===== */
 .main-content {
   margin-top: 80px;
   padding: 0px 0;
 }
 
-/* Chat Popup Styles */
+/* ===== AI CHAT ENHANCED STYLES ===== */
+.ai-chat-window {
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+}
+
+.ai-header {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+  padding: 18px 20px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.ai-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 30px;
+}
+
+.ai-icon-wrapper {
+  width: 45px;
+  height: 45px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: aiPulse 2s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+}
+
+.ai-icon {
+  font-size: 22px;
+  color: white;
+}
+
+.ai-header-text {
+  flex: 1;
+}
+
+.ai-header-text h3 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.ai-header-text p {
+  margin: 3px 0 0 0;
+  font-size: 0.75em;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-dot {
+  font-size: 6px;
+  color: #4ade80;
+  animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* AI Suggestions */
+.ai-suggestions {
+  padding: 15px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.suggestions-title {
+  font-size: 0.85em;
+  color: #6b7280;
+  margin-bottom: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.suggestions-title i {
+  color: #fbbf24;
+  font-size: 1.1em;
+}
+
+.suggestion-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 15px;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 0.85em;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.suggestion-btn i {
+  color: #8b5cf6;
+  font-size: 1.1em;
+}
+
+.suggestion-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  border-color: #8b5cf6;
+}
+
+.suggestion-btn:hover i {
+  color: white;
+}
+
+.suggestion-btn:last-child {
+  margin-bottom: 0;
+}
+
+/* AI Messages Container */
+.ai-messages {
+  background: linear-gradient(to bottom, #fefeff 0%, #f8f9ff 100%);
+  padding: 20px 15px;
+}
+
+/* AI Message Bubbles */
+.ai-message {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  animation: messageSlideIn 0.4s ease;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ai-message.bot .message-avatar {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  order: 1;
+}
+
+.ai-message.user .message-avatar {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  order: 3;
+}
+
+.ai-message.bot {
+  justify-content: flex-start;
+}
+
+.ai-message.user {
+  justify-content: flex-end;
+}
+
+.ai-bubble {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 0.9em;
+  line-height: 1.5;
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ai-message.bot .ai-bubble {
+  background: white;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 4px;
+  order: 2;
+}
+
+.ai-message.user .ai-bubble {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+  order: 2;
+}
+
+.bot-name {
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #8b5cf6;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bot-name::before {
+  content: "✨";
+  font-size: 1.1em;
+}
+
+/* AI Loading Indicator */
+.ai-loading-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 0;
+  margin-bottom: 16px;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.ai-loading p {
+  margin: 0;
+  font-size: 0.85em;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+/* AI Input Styles */
+.ai-input {
+  background: white;
+  border-top: 2px solid #e5e7eb;
+  padding: 12px 15px 8px 15px;
+}
+
+.ai-message-input {
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  transition: all 0.3s ease;
+}
+
+.ai-message-input:focus {
+  border-color: #8b5cf6;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.ai-send-btn {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.ai-send-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.ai-send-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+.ai-footer-note {
+  font-size: 0.7em;
+  color: #9ca3af;
+  text-align: center;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-style: italic;
+}
+
+.ai-footer-note i {
+  color: #8b5cf6;
+}
+
+/* ===== CHAT POPUP STYLES ===== */
 .chat-popup-wrapper {
   position: fixed;
   bottom: 20px;
@@ -1039,6 +1538,31 @@ body {
   box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
 }
 
+.ai-chat-toggle-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+  transition: all 0.3s ease;
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-chat-toggle-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 25px rgba(139, 92, 246, 0.5);
+}
+
 .notification-badge {
   position: absolute;
   top: -5px;
@@ -1055,16 +1579,29 @@ body {
   font-weight: bold;
 }
 
-.chat-window {
+.chat-window,
+.ai-chat-window {
+  display: none;
   width: 350px;
   height: 500px;
   background: white;
   border-radius: 20px;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  display: flex;
   flex-direction: column;
   animation: slideUp 0.3s ease;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+}
+
+.chatOpen .chat-window {
+  display: flex;
+}
+
+.aiChatOpen .ai-chat-window {
+  display: flex;
+  bottom: 90px;
 }
 
 @keyframes slideUp {
@@ -1084,6 +1621,10 @@ body {
   padding: 20px;
   text-align: center;
   position: relative;
+}
+
+.ai-chat-window .chat-header {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
 }
 
 .chat-header h3 {
@@ -1210,7 +1751,8 @@ body {
   justify-content: flex-end;
 }
 
-.message.support {
+.message.support,
+.message.bot {
   justify-content: flex-start;
 }
 
@@ -1237,6 +1779,13 @@ body {
   border-bottom-left-radius: 4px;
 }
 
+.message.bot .message-bubble {
+  background: #f3e8ff;
+  color: #333;
+  border: 1px solid #e5d4ff;
+  border-bottom-left-radius: 4px;
+}
+
 .message-time {
   font-size: 10px;
   opacity: 0.7;
@@ -1248,7 +1797,8 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.message.support .message-time {
+.message.support .message-time,
+.message.bot .message-time {
   color: #666;
 }
 
@@ -1353,7 +1903,7 @@ body {
   transform: translateY(0);
 }
 
-/* Footer */
+/* ===== FOOTER ===== */
 .footer {
   background: #1f2937;
   color: white;
@@ -1388,31 +1938,6 @@ body {
   color: #8bc792;
 }
 
-/* --- Disable header button effects --- */
-.nav-links a,
-.nav-links a:hover,
-.nav-links a:active,
-.book-btn,
-.book-btn:hover,
-.book-btn:active,
-.mobile-auth-btn,
-.mobile-auth-btn:hover,
-.mobile-auth-btn:active {
-  transition: none !important;
-  box-shadow: none !important;
-  transform: none !important;
-  text-shadow: none !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: white !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.nav-links a::before,
-.nav-links a::after,
-.book-btn::before {
-  display: none !important;
-}
-
 /* ===== RESPONSIVE STYLES ===== */
 
 /* Tablets (768px and below) */
@@ -1425,12 +1950,10 @@ body {
     display: flex;
   }
 
-  /* Hide desktop user actions */
   .desktop-only {
     display: none;
   }
 
-  /* Show mobile user actions in menu */
   .mobile-user-actions {
     display: block;
     margin-top: 2rem;
@@ -1481,8 +2004,8 @@ body {
     height: 40px !important;
   }
 
-  /* Chat window responsive */
-  .chat-window {
+  .chat-window,
+  .ai-chat-window {
     width: 90vw;
     max-width: 350px;
     height: 80vh;
@@ -1529,7 +2052,6 @@ body {
     min-width: 180px;
   }
 
-  /* Chat positioning for mobile */
   .chat-popup-wrapper {
     bottom: 15px;
     right: 15px;
@@ -1541,13 +2063,24 @@ body {
     font-size: 20px;
   }
 
-  .chat-window {
+  .ai-chat-toggle-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    bottom: 75px;
+  }
+
+  .chat-window,
+  .ai-chat-window {
     width: 95vw;
     height: 85vh;
     border-radius: 15px;
     bottom: 10px;
     right: 2.5vw;
-    position: fixed;
+  }
+
+  .aiChatOpen .ai-chat-window {
+    bottom: 70px;
   }
 
   .chat-header {
@@ -1590,7 +2123,6 @@ body {
     height: 36px;
   }
 
-  /* Footer responsive */
   .footer {
     padding: 2rem 1rem 1rem;
   }
@@ -1648,7 +2180,8 @@ body {
     min-width: 160px;
   }
 
-  .chat-window {
+  .chat-window,
+  .ai-chat-window {
     width: 98vw;
     height: 90vh;
     right: 1vw;
@@ -1659,6 +2192,13 @@ body {
     width: 45px;
     height: 45px;
     font-size: 18px;
+  }
+
+  .ai-chat-toggle-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+    bottom: 70px;
   }
 
   .notification-badge {
@@ -1674,7 +2214,8 @@ body {
 
 /* Landscape mobile (max-height: 500px) */
 @media screen and (max-height: 500px) and (orientation: landscape) {
-  .chat-window {
+  .chat-window,
+  .ai-chat-window {
     height: 90vh;
     width: 350px;
   }
@@ -1722,19 +2263,9 @@ body {
 
 /* Touch devices */
 @media (hover: none) and (pointer: coarse) {
-  .book-btn:hover,
-  .nav-links a:hover,
-  .chat-toggle-btn:hover,
-  .send-btn:hover,
-  .start-chat-btn:hover,
-  .start-new-session-btn:hover,
-  .mobile-auth-btn:hover {
-    transform: none;
-    box-shadow: inherit;
-  }
-
   .book-btn:active,
   .chat-toggle-btn:active,
+  .ai-chat-toggle-btn:active,
   .send-btn:active,
   .start-chat-btn:active,
   .mobile-auth-btn:active {
@@ -1755,7 +2286,8 @@ body {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .chat-window {
+  .chat-window,
+  .ai-chat-window {
     background: #1f2937;
     color: white;
   }
@@ -1764,18 +2296,14 @@ body {
     background: #111827;
   }
 
-  .message.support .message-bubble {
+  .message.support .message-bubble,
+  .message.bot .message-bubble {
     background: #374151;
     color: white;
     border-color: #4b5563;
   }
 
-  .welcome-screen input {
-    background: #374151;
-    color: white;
-    border-color: #4b5563;
-  }
-
+  .welcome-screen input,
   .message-input {
     background: #374151;
     color: white;

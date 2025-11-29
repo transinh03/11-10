@@ -131,7 +131,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-
+builder.Services.AddHttpClient();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IOTPService, OtpService>();
