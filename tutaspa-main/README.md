@@ -28,7 +28,7 @@ Mục tiêu: hỗ trợ **khách hàng đặt lịch online**, **nhân viên thu
 
 ### 1. Clone project
 ```bash
-git clone https://github.com/tutai13/tutaspa
+git clone https://github.com/transinh03/11-10/tree/main/tutaspa-main
 ```
 
 ### 2. Cấu hình Backend
@@ -113,5 +113,5 @@ npm run dev
 ---
 
 ## 👨‍💻 Tác giả
-**Team Project – 7 thành viên**  
-Quản lý repo chính: [Đỗ Tuấn Tài](https://github.com/tutai13)  
+**Team Project – 5 thành viên**  
+Quản lý repo chính: [Trần Công Thiện Sinh]
