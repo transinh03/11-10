@@ -345,7 +345,7 @@ namespace API.Services
             var randPass = RandomNumberGenerator.GetInt32(111111, 999999).ToString();
 
             _cache.Set($"otp_{email}", randPass, DateTimeOffset.Now.AddMinutes(5));
-            await emailService.SendEmailSendGridAsync(email, "Đây là mã xác nhận đổi mật khẩu của bạn :", $"<h1>Mã xác nhận có hiệu lực trong 5 phút</h1><p>Vui lòng không cung cấp cho bất kỳ ai</p><p>Mã xác nhận là: <strong>{randPass}</strong></p>");
+            await emailService.SendEmailAsync(email, "Đây là mã xác nhận đổi mật khẩu của bạn :", $"<h1>Mã xác nhận có hiệu lực trong 5 phút</h1><p>Vui lòng không cung cấp cho bất kỳ ai</p><p>Mã xác nhận là: <strong>{randPass}</strong></p>");
         }
         
 

@@ -71,7 +71,7 @@ namespace API.Services
             try
             {
                 // Gửi email
-                await _mail.SendEmailSendGridAsync(
+                await _mail.SendEmailAsync(
                     email,
                     "Mã OTP xác thực - Tuta Spa",
                     $"<h2>Xin chào {email}</h2>" +
