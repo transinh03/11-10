@@ -6,7 +6,7 @@
         <div class="col">
           <h2 class="page-title mb-0">
             <i class="fas fa-chart-line me-2"></i>
-            Thống kê & Báo cáo
+            ThỐNG KÊ & BÁO CÁO
           </h2>
           <p class="text-muted mb-0">Quản lý thu chi và chi phí</p>
         </div>

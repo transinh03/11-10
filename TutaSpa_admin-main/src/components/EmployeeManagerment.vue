@@ -5,7 +5,7 @@
       <div class="card-header">
         <h2 class="section-title">
           <i class="fas fa-user-plus"></i>
-          Thêm nhân viên mới
+          THÊM NHÂN VIÊN MỚI
         </h2>
         <button 
           @click="toggleAddForm" 

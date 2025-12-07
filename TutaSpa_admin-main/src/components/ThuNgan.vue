@@ -4,7 +4,7 @@
     <div class="header">
       <h1 class="title">
         <i class="fas fa-cash-register"></i>
-        Thu Ngân
+        THU NGÂN
       </h1>
     </div>
 

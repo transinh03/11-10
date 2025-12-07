@@ -5,7 +5,7 @@
       <div class="d-flex justify-content-between align-items-center">
         <div class="header-title">
           <h2 class="mb-1 text-white">
-            <i class="fas fa-chart-line me-2"></i>Quản lý Hệ thống
+            <i class="fas fa-chart-line me-2"></i>QUẢN LÝ HỆ THỐNG
           </h2>
           <p class="text-light mb-0 opacity-75">Theo dõi lịch hẹn và hóa đơn</p>
         </div>

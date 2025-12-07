@@ -2,7 +2,7 @@
   <div class="service-management container d-flex flex-column align-items-center mt-5">
     <!-- Tiêu đề -->
     <h2 class="page-title mb-4">
-      <i class="fa fa-cogs me-2"></i> Quản lý Dịch vụ
+      <i class="fa fa-cogs me-2"></i> QUẢN LÝ DỊCH VỤ
     </h2>
 
     <!-- Các lựa chọn -->
