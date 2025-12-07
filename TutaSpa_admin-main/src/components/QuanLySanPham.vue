@@ -2,7 +2,8 @@
 <template>
   <div class="container d-flex flex-column align-items-center justify-content-start mt-5 min-vh-100" style="background-color: #ffffff;">
     <h2 class="page-title mb-4 text-dark">
-      <i class="fa fa-warehouse me-2"></i> Quản lý kho
+      <i class="fa fa-warehouse me-2"></i> QUẢN LÝ KHO
+    
     </h2>
 
     <div class="d-flex flex-wrap justify-content-center gap-4">

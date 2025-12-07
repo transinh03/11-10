@@ -4,7 +4,7 @@
       <div class="header">
         <h1 class="title">
           <i class="fas fa-warehouse"></i>
-          Quản lý kho
+          QUẢN LÝ KHO
         </h1>
       </div>
 

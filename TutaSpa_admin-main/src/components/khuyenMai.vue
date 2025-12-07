@@ -5,7 +5,7 @@
       <div class="card-header">
         <h2 class="section-title">
           <i class="fas fa-ticket-alt"></i>
-          Thêm voucher mới
+          THÊM VOUCHER MỚI
         </h2>
         <button 
           @click="toggleAddForm" 

@@ -27,7 +27,7 @@
                 <i class="fas fa-star-half-alt"></i>
               </div>
               <div>
-                <h1 class="page-title mb-2">Quản lý đánh giá khách hàng</h1>
+                <h1 class="page-title mb-2">QUẢN LÝ ĐÁNH GIÁ KHÁCH HÀNG</h1>
                 <p class="page-subtitle mb-0">Theo dõi và quản lý phản hồi từ khách hàng</p>
               </div>
             </div>

@@ -5,7 +5,7 @@
       <div class="sidebar-header">
         <h2 class="section-title">
           <i class="fas fa-comments"></i>
-          Đoạn chat
+          ĐOẠN CHAT
         </h2>
         <div class="header-actions">
           <button class="btn btn-outline-primary" @click="refreshSessions">
