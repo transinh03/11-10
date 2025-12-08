@@ -129,7 +129,7 @@
         </template>
 
         <!-- InventoryManager -->
-        <!-- <template v-if="authStore.isInventoryManager"> -->
+        <template v-if="authStore.isInventoryManager || authStore.isAdmin">
         <router-link
           to="/kho"
           class="menu-item"
@@ -138,10 +138,10 @@
         >
           <i class="fas fa-columns"></i>
         </router-link>
-        <!-- </template> -->
+       </template>
 
         <!-- Cashier -->
-        <!-- <template v-if="authStore.isCashier"> -->
+        <template v-if="authStore.isCashier || authStore.isAdmin">
         <router-link
           to="/ThuNgan"
           class="menu-item"
@@ -158,7 +158,7 @@
         >
           <i class="fa-solid fa-comment"></i>
         </router-link>
-        <!-- </template> -->
+        </template>
 
         <div v-if="authStore.isAdmin" class="menu-title">Thống kê</div>
 
